@@ -1,0 +1,99 @@
+import { test, expect, Page, Locator } from '@playwright/test';
+
+class LoginPage {
+	readonly page: Page;
+	readonly loginField: Locator;
+	readonly passwordField: Locator;
+	readonly loginButton: Locator;
+
+	constructor(page: Page) {
+		this.page = page;
+		this.loginField = page.locator('input[name="login"]');
+		this.passwordField = page.locator('input[name="password"]');
+		this.loginButton = page.locator('.b-button.b-button--new_design.b-button--blue.b-authentication-form-button.b-authentication-form-button--auth');
+	}
+
+	async goto() {
+		await this.page.goto('', { waitUntil: 'domcontentloaded' }); //ссылка на инстанс в ''
+	}
+
+	async login(username: string, password: string) {
+		await this.loginField.waitFor({ state: 'visible' });
+		await this.loginField.fill(username);
+		await this.passwordField.waitFor({ state: 'visible' });
+		await this.passwordField.fill(password);
+		await Promise.all([
+			this.page.waitForLoadState('networkidle'),
+			this.loginButton.click()
+		]);
+		
+	}
+}
+
+class MainPage {
+	constructor(private page: Page) {}
+
+	async getMenuTexts(): Promise<string[]> {
+		const items = this.page.locator('.b-sidebar-menu-text:visible');
+		const texts = (await items.allInnerTexts()).map(t => t.replace(/\s+/g, ' ').trim()).filter(Boolean);
+		return texts;
+	}
+
+	async getIndexOf(itemText: string): Promise<number> {
+		const texts = await this.getMenuTexts();
+		return texts.map(t => t.toLowerCase()).indexOf(itemText.toLowerCase());
+	}
+
+	async isSettingsVisible(): Promise<boolean> {
+		const candidate = this.page.locator('.b-sidebar-menu-text:visible').filter({ hasText: 'Настройки' });
+		return (await candidate.count()) > 0 && (await candidate.first().isVisible());
+	}
+}
+
+test.beforeAll(async () => {
+	console.log('Запуск теста');
+});
+
+test('АПорядок разделов и отсутствие "Настройки"', async ({ page }) => {
+	const login = new LoginPage(page);
+	await login.goto();
+	await login.login('', ''); // 'логин(почта)', 'пароль' из ТЗ
+	
+
+	const main = new MainPage(page);
+
+	
+	const expectedOrder = [
+		'Пульс',
+		'Задачи',
+		'События',
+		'Календарь',
+		'Дела',
+		'Корреспонденция',
+		'Мониторинг',
+		'Подписки',
+		'Финансы',
+		'Отчеты',
+		'Документы',
+		'Контакты',
+		'Администрирование'
+	];
+
+	
+	let prevIndex = -1;
+	for (const section of expectedOrder) {
+		const idx = await main.getIndexOf(section);
+		expect(idx, `Раздел "${section}" идёт раньше, чем должен`).toBeGreaterThan(prevIndex);
+		prevIndex = idx;
+	}
+	console.log('Порядок правильный: ', expectedOrder.join(' → '));
+
+	
+	const settingsVisible = await main.isSettingsVisible();
+	expect(settingsVisible).toBeFalsy();
+	console.log('Раздела "Настройки" нет');
+});
+
+test.afterAll(async () => {
+	console.log('Тест завершён');
+});
