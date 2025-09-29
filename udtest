@@ -1,0 +1,98 @@
+import { test, expect, Page, Locator } from '@playwright/test';
+
+
+class LoginPage {
+  readonly page: Page;
+  readonly loginField: Locator;
+  readonly passwordField: Locator;
+  readonly loginButton: Locator;
+
+  constructor(page: Page) {
+    this.page = page;
+  
+    this.loginField = page.locator('input[name="login"]');
+    this.passwordField = page.locator('input[name="password"]');
+    this.loginButton = page.locator('.b-button.b-button--new_design.b-button--blue.b-authentication-form-button.b-authentication-form-button--auth');
+  }
+
+  async goto() {
+    await this.page.goto(''); // ссылка на инстанс в ' ' из ТЗ
+  }
+
+  async login(username: string, password: string) {
+  await this.loginField.waitFor({ state: 'visible' });
+  await this.loginField.fill(username);
+  
+  await this.passwordField.waitFor({ state: 'visible' });
+  await this.passwordField.fill(password);
+  
+  await this.loginButton.click();
+ }
+} 
+
+
+class AdminPage {
+  readonly page: Page;
+  readonly applicationsMenu: Locator;
+  readonly versionDescription: Locator;
+
+  constructor(page: Page) {
+    this.page = page;
+    this.applicationsMenu = page.locator('.b-sidebar-menu-text').filter({ hasText: 'Приложения' });
+    this.versionDescription = page.locator('.b-shell_applications-description')
+      .filter({ hasText: 'Управляй (Делами)' })
+      .filter({ hasText: 'Версия' });
+  } 
+
+  async navigateToApplications() {
+    const adminSection = this.page.locator('.b-sidebar-menu-text').filter({ hasText: 'Администрирование' });
+    await adminSection.click();
+    
+    
+    await this.applicationsMenu.click();
+  }
+
+  async getVersionText(): Promise<string> {
+    return await this.versionDescription.textContent() || '';
+  }
+}
+
+
+test.describe(() => {
+  let loginPage: LoginPage;
+  let adminPage: AdminPage;
+
+  test.beforeEach(async ({ page }) => {
+    loginPage = new LoginPage(page);
+    adminPage = new AdminPage(page);
+  });
+
+  test('', async ({ page }) => {
+    
+    await loginPage.goto();
+    await loginPage.login(''); // 'логин(почта)', 'пароль' из ТЗ
+    await page.waitForLoadState('networkidle');
+    
+    
+    await adminPage.navigateToApplications();
+    
+    
+    const versionText = await adminPage.getVersionText();
+    
+    
+    expect(versionText).toContain('Версия 8.0.38');
+    
+    console.log(`Найденная версия: ${versionText}`);
+  });
+});
+
+
+test.beforeAll(async () => {
+  
+  console.log('Запуск теста для проверки версии УД');
+});
+
+test.afterAll(async () => {
+  console.log('Тест завершен');
+});
+
